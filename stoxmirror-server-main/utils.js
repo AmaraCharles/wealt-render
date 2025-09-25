@@ -405,8 +405,8 @@ const sendWelcomeEmail = async ({ to, token }) => {
 
   let transporter = nodemailer.createTransport({
     host: "mail.privateemail.com",
-     port: 587, // try 587 instead of 465
-  secure: false, // use STARTTLS instead of SSL
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER, // generated ethereal user
       pass: process.env.EMAIL_PASSWORD, // generated ethereal password
