@@ -7,26 +7,19 @@ const { v4: uuidv4 } = require("uuid");
 
 // Define the Trader schema
 const TraderSchema = new mongoose.Schema({
-  name: String,
-  frequency: String,
-  risk: String,
-  id: String,
-  signal: String,
-  winrate: String,
-  drawdown: String,
-  photo: String,
-  strategy: String,
-  type: String,
-  profit: String,
-  confidence: String,
-  membership: String,
-  returns: String, // fixed typo: was `return`
-  country: String,
-  maxEarn: String,
-  range: String,
-  followers: String,
-  history: Array,
-  trades: String,
+   name:String,
+    level:String,
+    rating:String,
+    trades:Array,
+    commission:String,
+    pnl:String,
+    profileId:String,
+    accountLevel:String,
+    type:String,
+    history:Array,
+    followers:String,
+    watchers:String,
+    profitableTrade:String
 });
 
 // Create the Trader model
@@ -36,72 +29,69 @@ const Trader = mongoose.model('Trader', TraderSchema);
 router.post("/register", async (req, res) => {
   const {
     name,
-    frequency,
-    risk,
-    id,
-    signal,
-    winrate,
-    drawdown,
-    photo,
-    strategy,
-    type,
-    profit,
-    confidence,
-    membership,
-    returns,
-    country,
-    maxEarn,
-    range,
-    followers,
-    history,
+    level,
+    rating,
     trades,
+    commission,
+    pnl,
+    profileId,
+    accountLevel,
+    type,
+    history,
+    followers,
+    watchers,
+    profitableTrade
   } = req.body;
 
   try {
-    const userExists = await Trader.findOne({ id });
+    // 🔹 Check if trader with same profileId exists
+    const existingTrader = await Trader.findOne({ profileId });
 
-    if (userExists) {
+    if (existingTrader) {
       return res.status(400).json({
         success: false,
-        message: "Id is already in use",
+        message: "Profile ID is already registered",
       });
     }
 
+    // 🔹 Construct new trader record
     const newTrader = {
       name,
-      frequency,
-      risk,
-      id,
-      signal,
-      winrate,
-      drawdown,
-      photo,
-      strategy,
-      type,
-      profit,
-      confidence,
-      membership,
-      returns,
-      country,
-      maxEarn,
-      range,
-      followers,
-      history: history || [],
+      level,
+      rating,
       trades,
+      commission,
+      pnl,
+      profileId,
+      accountLevel,
+      type,
+      history: history || [],
+      followers: followers || 0,
+      watchers: watchers || 0,
+      profitableTrade: profitableTrade || 0,
     };
 
-    const createdUser = await Trader.create(newTrader);
-    const token = uuidv4(); // Not used, but left in case you plan to add email verification or sessions
+    // 🔹 Save to DB
+    const createdTrader = await Trader.create(newTrader);
 
-    return res.status(200).json({ code: "Ok", data: createdUser });
+    // 🔹 Optional: unique token (if needed later for sessions)
+    // const token = uuidv4();
+
+    return res.status(200).json({
+      success: true,
+      code: "OK",
+      message: "Trader registered successfully",
+      data: createdTrader,
+    });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("❌ Error creating trader:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
     });
   }
 });
+
 
 // Login route (by trader ID)
 router.post("/login", async (req, res) => {
