@@ -93,6 +93,13 @@ const otpExpiration = Date.now() + (5 * 60 * 1000); // 5 minutes in milliseconds
       isDisabled: false,
       referredUsers:[],
       copyTradingActive:[],
+      rewards: [
+        { id: 'welcome', title: 'Welcome Bonus', description: 'Sign up and verify your account', amount: 25.00, claimed: false },
+        { id: 'first-deposit', title: 'First Deposit', description: 'Make your first deposit of $100+', amount: 50.00, claimed: false },
+        { id: 'first-trade', title: 'First Trade', description: 'Execute your first trade', amount: 10.00, claimed: false },
+        { id: 'weekly-trader', title: 'Weekly Trader', description: 'Complete 10 trades this week', amount: 100.00, claimed: false },
+        { id: 'copy-trading', title: 'Copy Trading Master', description: 'Follow 3 master traders', amount: 75.00, claimed: false }
+      ],
       referralCode: generateReferralCode(6), // Generate a referral code for the new user
       referredBy:null, // Store the ID of the referrer if applicable
     };

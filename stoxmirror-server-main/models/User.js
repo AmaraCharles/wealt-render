@@ -83,6 +83,9 @@ const UsersSchema = new mongoose.Schema({
   withdrawals: {
     type: Array,
   },
+   rewards: {
+    type: Array,
+  },
   copyTradingActive: {
     type: Array,
   },
