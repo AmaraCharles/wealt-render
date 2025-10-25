@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require("uuid");
 const TraderSchema = new mongoose.Schema({
    name:String,
     level:String,
+     photo:String,
     rating:String,
     trades:Array,
     commission:String,
@@ -31,7 +32,7 @@ router.post("/register", async (req, res) => {
     name,
     level,
     rating,
-   
+    photo,
     commission,
     pnl,
     profileId,
@@ -59,7 +60,8 @@ router.post("/register", async (req, res) => {
       name,
       level,
       rating,
-      trades[],
+      photo,
+      trades:[],
       commission,
       pnl,
       profileId,
