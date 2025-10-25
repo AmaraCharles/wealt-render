@@ -92,6 +92,7 @@ const otpExpiration = Date.now() + (5 * 60 * 1000); // 5 minutes in milliseconds
       verified: false,
       isDisabled: false,
       referredUsers:[],
+      copyTradingActive:[],
       referralCode: generateReferralCode(6), // Generate a referral code for the new user
       referredBy:null, // Store the ID of the referrer if applicable
     };
