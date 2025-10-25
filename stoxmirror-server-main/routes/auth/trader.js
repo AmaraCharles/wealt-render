@@ -37,10 +37,8 @@ router.post("/register", async (req, res) => {
     profileId,
     accountLevel,
     type,
-    history,
-    followers,
-    watchers,
-    profitableTrade
+    
+    
   } = req.body;
 
   try {
