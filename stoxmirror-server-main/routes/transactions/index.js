@@ -220,6 +220,50 @@ router.post("/:_id/plan", async (req, res) => {
 });
 
 
+// POST /users/:_id/subplan
+router.post("/:_id/subplan", async (req, res) => {
+  const { _id } = req.params;
+  const { subname, subamount, from, timestamp, to } = req.body;
+
+  const user = await UsersDatabase.findOne({ _id });
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  try {
+    const newBalance = user.balance - Number(subamount);
+
+    await user.updateOne({
+      $push: {
+        plan: {
+          _id: uuidv4(),
+          subname,
+          subamount,
+          from,
+          to,
+          timestamp,
+          status: "PENDING",
+        },
+      },
+      $set: { balance: newBalance },
+    });
+
+    sendPlanEmail({ subamount, subname, from, timestamp });
+    sendUserPlanEmail({ subamount, subname, from, to, timestamp });
+
+    res.status(200).json({
+      success: true,
+      message: "Plan successfully purchased",
+    });
+
+  } catch (error) {
+    console.error("❌ Plan creation error:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
+
+
+
 router.post("/:_id/auto", async (req, res) => {
   const { _id } = req.params;
   const { copysubname, copysubamount, from ,timestamp,to} = req.body;
@@ -775,6 +819,7 @@ router.get("/trades/:tradeId", async (req, res) => {
   }
 });
 // PUT /trades/:tradeId/command
+// PUT /trades/:tradeId/command
 router.put("/trades/:tradeId/command", async (req, res) => {
   try {
     const { tradeId } = req.params;
@@ -784,69 +829,66 @@ router.put("/trades/:tradeId/command", async (req, res) => {
       return res.status(400).json({ error: "Invalid command value" });
     }
 
-    // Find user containing the trade
-    const user = await UsersDatabase.findOne({ "planHistory._id": tradeId });
+    // Find user by plan._id
+    const user = await UsersDatabase.findOne({ "plan._id": tradeId });
     if (!user) return res.status(404).json({ error: "Trade not found" });
 
-    // Find the specific trade
-    const trade = user.planHistory.find(t => t._id.toString() === tradeId);
+    const trade = user.plan.find(p => p._id.toString() === tradeId);
     if (!trade) return res.status(404).json({ error: "Trade not found in user" });
 
-    // Update trade command and initial status/startTime
+    // Update trade status
     await UsersDatabase.updateOne(
-      { "planHistory._id": tradeId },
+      { "plan._id": tradeId },
       {
         $set: {
-          "planHistory.$.command": command,
-          "planHistory.$.status": command === "true" ? "RUNNING" : "DECLINED",
-          "planHistory.$.startTime": command === "true" ? new Date() : trade.startTime
-        }
+          "plan.$.command": command,
+          "plan.$.status": command === "true" ? "RUNNING" : "DECLINED",
+          "plan.$.startTime": command === "true" ? new Date() : trade.startTime,
+        },
       }
     );
 
-    // If trade is activated, schedule completion
+    // If activated, schedule completion
     if (command === "true") {
       setTimeout(async () => {
         try {
-          const updatedUser = await UsersDatabase.findOne({ "planHistory._id": tradeId });
-          const runningTrade = updatedUser.planHistory.find(t => t._id.toString() === tradeId);
-          if (!runningTrade || runningTrade.status === "COMPLETED") return;
+          const updatedUser = await UsersDatabase.findOne({ "plan._id": tradeId });
+          const activeTrade = updatedUser.plan.find(p => p._id.toString() === tradeId);
 
-          const finalProfit = Number(runningTrade.profit) || 0;
+          if (!activeTrade || activeTrade.status === "COMPLETED") return;
+
+          const finalProfit = Number(activeTrade.profit) || 0;
           const isWin = finalProfit > 0;
 
-          // Complete the trade
           await UsersDatabase.updateOne(
-            { "planHistory._id": tradeId },
+            { "plan._id": tradeId },
             {
               $set: {
-                "planHistory.$.status": "COMPLETED",
-                "planHistory.$.exitPrice": 123.45, // replace with real exit price
-                "planHistory.$.profit": finalProfit,
-                "planHistory.$.result": isWin ? "WON" : "LOST"
-              }
+                "plan.$.status": "COMPLETED",
+                "plan.$.profit": finalProfit,
+                "plan.$.result": isWin ? "WON" : "LOST",
+                "plan.$.exitPrice": 123.45, // demo placeholder
+              },
             }
           );
 
-          // Add profit to user balance if trade is won
           if (isWin && finalProfit > 0) {
             await UsersDatabase.updateOne(
               { _id: updatedUser._id },
-              { $inc: { profit: finalProfit } }
+              { $inc: { balance: finalProfit } }
             );
-            console.log(`✅ Profit ${finalProfit} added to user ${updatedUser._id}`);
           }
 
         } catch (err) {
-          console.error("Trade timer error:", err);
+          console.error("Trade completion error:", err);
         }
-      }, Number(trade.duration) * 60 * 1000); // duration in minutes
+      }, Number(trade.duration) * 60 * 1000);
     }
 
     res.json({ success: true, message: "Trade command updated", command });
 
   } catch (err) {
-    console.error("Error updating command:", err);
+    console.error("Trade command error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
