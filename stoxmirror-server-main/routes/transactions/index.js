@@ -223,7 +223,7 @@ router.post("/:_id/plan", async (req, res) => {
 // POST /users/:_id/subplan
 router.post("/:_id/subplan", async (req, res) => {
   const { _id } = req.params;
-  const { subname, subamount, from, timestamp, to } = req.body;
+  const { subname, subamount, from, to, timestamp, investmentObject } = req.body;
 
   const user = await UsersDatabase.findOne({ _id });
   if (!user) {
@@ -231,34 +231,54 @@ router.post("/:_id/subplan", async (req, res) => {
   }
 
   try {
-    const newBalance = user.balance - Number(subamount);
+    // ensure numeric
+    const amountNum = Number(subamount || (investmentObject && investmentObject.amount) || 0);
+    const now = timestamp || new Date().toISOString();
 
-    await user.updateOne({
-      $push: {
-        plan: {
-          _id: uuidv4(),
-          subname,
-          subamount,
-          from,
-          to,
-          timestamp,
-          status: "PENDING",
-        },
-      },
-      $set: { balance: newBalance },
-    });
+    // Build investment entry server-side if not provided fully
+    const investment = investmentObject || {
+      _id: uuidv4(),
+      planId: investmentObject?.planId || null,
+      planName: subname,
+      amount: amountNum,
+      dailyProfitRate: investmentObject?.dailyProfitRate || 0,
+      duration: investmentObject?.duration || 0, // in days
+      startDate: now,
+      startTime: now,
+      endDate: investmentObject?.endDate || new Date(Date.now() + (investmentObject?.duration || 0) * 24 * 60 * 60 * 1000).toISOString(),
+      daysElapsed: 0,
+      totalProfit: 0,
+      status: investmentObject?.status || 'active',
+      lastProfitUpdate: now,
+      from: from,
+      to: to,
+      timestamp: now,
+      command: null,
+      profit: 0,
+      result: null,
+      exitPrice: null
+    };
 
-    sendPlanEmail({ subamount, subname, from, timestamp });
-    sendUserPlanEmail({ subamount, subname, from, to, timestamp });
+    // update balance and push plan atomically
+    const newBalance = Number(user.balance) - amountNum;
 
-    res.status(200).json({
-      success: true,
-      message: "Plan successfully purchased",
-    });
+    await UsersDatabase.updateOne(
+      { _id },
+      {
+        $push: { plan: investment },
+        $set: { balance: newBalance }
+      }
+    );
 
+    // optional: send emails
+    sendPlanEmail({ subamount: amountNum, subname, from, timestamp: now });
+    sendUserPlanEmail({ subamount: amountNum, subname, from, to, timestamp: now });
+
+    apiLog('INVESTMENT_CREATED', { userId: _id, investment });
+    return res.status(200).json({ success: true, message: "Plan successfully purchased", investment });
   } catch (error) {
-    console.error("❌ Plan creation error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    console.error('Error creating plan:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
@@ -820,6 +840,7 @@ router.get("/trades/:tradeId", async (req, res) => {
 });
 // PUT /trades/:tradeId/command
 // PUT /trades/:tradeId/command
+// PUT /trades/:tradeId/command
 router.put("/trades/:tradeId/command", async (req, res) => {
   try {
     const { tradeId } = req.params;
@@ -829,35 +850,45 @@ router.put("/trades/:tradeId/command", async (req, res) => {
       return res.status(400).json({ error: "Invalid command value" });
     }
 
-    // Find user by plan._id
+    // Find user containing the trade in user.plan
     const user = await UsersDatabase.findOne({ "plan._id": tradeId });
     if (!user) return res.status(404).json({ error: "Trade not found" });
 
-    const trade = user.plan.find(p => p._id.toString() === tradeId);
-    if (!trade) return res.status(404).json({ error: "Trade not found in user" });
+    const planEntry = user.plan.find(p => p._id.toString() === tradeId);
+    if (!planEntry) return res.status(404).json({ error: "Trade not found in user" });
 
-    // Update trade status
+    // Set startTime/startDate when activating
+    const startTime = command === "true" ? new Date() : planEntry.startTime || new Date(planEntry.startDate);
+    const status = command === "true" ? "RUNNING" : (command === "declined" ? "DECLINED" : "INACTIVE");
+
     await UsersDatabase.updateOne(
       { "plan._id": tradeId },
       {
         $set: {
           "plan.$.command": command,
-          "plan.$.status": command === "true" ? "RUNNING" : "DECLINED",
-          "plan.$.startTime": command === "true" ? new Date() : trade.startTime,
-        },
+          "plan.$.status": status,
+          "plan.$.startTime": startTime,
+          "plan.$.startDate": planEntry.startDate || startTime.toISOString()
+        }
       }
     );
 
-    // If activated, schedule completion
+    // If activated, schedule completion based on duration
     if (command === "true") {
+      // convert duration (days) to ms for schedule: use days -> ms
+      const durationDays = Number(planEntry.duration) || 0;
+      const durationMs = durationDays * 24 * 60 * 60 * 1000;
+
       setTimeout(async () => {
         try {
           const updatedUser = await UsersDatabase.findOne({ "plan._id": tradeId });
-          const activeTrade = updatedUser.plan.find(p => p._id.toString() === tradeId);
+          const runningPlan = updatedUser.plan.find(p => p._id.toString() === tradeId);
+          if (!runningPlan || runningPlan.status === "COMPLETED") return;
 
-          if (!activeTrade || activeTrade.status === "COMPLETED") return;
+          // Example profit calc: dailyProfitRate * duration * amount / 100
+          const dailyRate = Number(runningPlan.dailyProfitRate) || 0;
+          const finalProfit = (dailyRate / 100) * Number(runningPlan.amount) * (Number(runningPlan.duration) || 0);
 
-          const finalProfit = Number(activeTrade.profit) || 0;
           const isWin = finalProfit > 0;
 
           await UsersDatabase.updateOne(
@@ -865,10 +896,11 @@ router.put("/trades/:tradeId/command", async (req, res) => {
             {
               $set: {
                 "plan.$.status": "COMPLETED",
+                "plan.$.exitPrice": runningPlan.exitPrice || null,
                 "plan.$.profit": finalProfit,
                 "plan.$.result": isWin ? "WON" : "LOST",
-                "plan.$.exitPrice": 123.45, // demo placeholder
-              },
+                "plan.$.lastProfitUpdate": new Date().toISOString()
+              }
             }
           );
 
@@ -877,21 +909,21 @@ router.put("/trades/:tradeId/command", async (req, res) => {
               { _id: updatedUser._id },
               { $inc: { balance: finalProfit } }
             );
+            console.log(`✅ Profit ${finalProfit} added to user ${updatedUser._id}`);
           }
-
         } catch (err) {
-          console.error("Trade completion error:", err);
+          console.error("Trade timer error:", err);
         }
-      }, Number(trade.duration) * 60 * 1000);
+      }, durationMs);
     }
 
-    res.json({ success: true, message: "Trade command updated", command });
-
+    return res.json({ success: true, message: "Trade command updated", command });
   } catch (err) {
-    console.error("Trade command error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error("Error updating command:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 
