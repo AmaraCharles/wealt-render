@@ -283,6 +283,41 @@ router.post("/:_id/subplan", async (req, res) => {
 });
 
 
+router.post("/copy-trade/start", async (req, res) => {
+  try {
+    const { userId, traderName, amount, duration } = req.body;
+
+    if (!userId || !traderName || !amount || !duration) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    const user = await Users.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    const newCopyTrade = {
+      trader: traderName,
+      amount,
+      duration,
+      startDate: new Date().toISOString(),
+      status: "ACTIVE",
+    };
+
+    if (!user.copyTradingActive) user.copyTradingActive = [];
+    user.copyTradingActive.push(newCopyTrade);
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Copy trade started successfully.",
+      data: newCopyTrade,
+    });
+  } catch (error) {
+    console.error("Error starting copy trade:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
 router.post("/:_id/auto", async (req, res) => {
   const { _id } = req.params;
