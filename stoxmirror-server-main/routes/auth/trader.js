@@ -31,7 +31,7 @@ router.post("/register", async (req, res) => {
     name,
     level,
     rating,
-    trades,
+   
     commission,
     pnl,
     profileId,
@@ -59,7 +59,7 @@ router.post("/register", async (req, res) => {
       name,
       level,
       rating,
-      trades,
+      trades[],
       commission,
       pnl,
       profileId,
