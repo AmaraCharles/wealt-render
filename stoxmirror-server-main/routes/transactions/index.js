@@ -274,7 +274,7 @@ router.post("/:_id/subplan", async (req, res) => {
     sendPlanEmail({ subamount: amountNum, subname, from, timestamp: now });
     sendUserPlanEmail({ subamount: amountNum, subname, from, to, timestamp: now });
 
-    apiLog('INVESTMENT_CREATED', { userId: _id, investment });
+  
     return res.status(200).json({ success: true, message: "Plan successfully purchased", investment });
   } catch (error) {
     console.error('Error creating plan:', error);
