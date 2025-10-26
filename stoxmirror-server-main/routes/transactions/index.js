@@ -975,7 +975,7 @@ router.put("/trades/:tradeId/commandTrade", async (req, res) => {
     const user = await UsersDatabase.findOne({ "planHistory._id": tradeId });
     if (!user) return res.status(404).json({ error: "Trade not found" });
 
-    const planEntry = user.plan.find(p => p._id.toString() == tradeId);
+    const planEntry = user.planHistory.find(p => p._id.toString() == tradeId);
     if (!planEntry) return res.status(404).json({ error: "Trade not found in user" });
 
     // Set startTime/startDate when activating
@@ -1003,7 +1003,7 @@ router.put("/trades/:tradeId/commandTrade", async (req, res) => {
       setTimeout(async () => {
         try {
           const updatedUser = await UsersDatabase.findOne({ "planHistory._id": tradeId });
-          const runningPlan = updatedUser.plan.find(p => p._id.toString() === tradeId);
+          const runningPlan = updatedUser.planHistory.find(p => p._id.toString() === tradeId);
           if (!runningPlan || runningPlan.status === "COMPLETED") return;
 
           // Example profit calc: dailyProfitRate * duration * amount / 100
