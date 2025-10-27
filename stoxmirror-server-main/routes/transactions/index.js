@@ -294,6 +294,14 @@ router.post("/copy-trade/start", async (req, res) => {
     const user = await UsersDatabase.findById(userId);
     if (!user) return res.status(404).json({ error: "User not found." });
 
+    // Check if user has enough balance
+    if (user.balance < amount) {
+      return res.status(400).json({ error: "Insufficient balance." });
+    }
+
+    // Subtract amount from balance
+    user.balance -= amount;
+
     const newCopyTrade = {
       trader: traderName,
       amount,
@@ -311,13 +319,13 @@ router.post("/copy-trade/start", async (req, res) => {
       success: true,
       message: "Copy trade started successfully.",
       data: newCopyTrade,
+      balance: user.balance // return updated balance if needed
     });
   } catch (error) {
     console.error("Error starting copy trade:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 
 router.post("/:_id/auto", async (req, res) => {
   const { _id } = req.params;
