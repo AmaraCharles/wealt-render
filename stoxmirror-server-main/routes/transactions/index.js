@@ -970,90 +970,6 @@ router.put("/trades/:tradeId/command", async (req, res) => {
 
 
 
-// router.put("/trades/:tradeId/commandTrade", async (req, res) => {
-//   try {
-//     const { tradeId } = req.params;
-//     const { command } = req.body;
-
-//     if (!["false", "true", "declined"].includes(command)) {
-//       return res.status(400).json({ error: "Invalid command value" });
-//     }
-
-//     // Find user containing the trade in user.plan
-//     const user = await UsersDatabase.findOne({ "planHistory._id": tradeId });
-//     if (!user) return res.status(404).json({ error: "Trade not found" });
-
-//     const planEntry = user.planHistory.find(p => p._id.toString() == tradeId);
-//     if (!planEntry) return res.status(404).json({ error: "Trade not found in user" });
-
-//     // Set startTime/startDate when activating
-//     const startTime = command === "true" ? new Date() : planEntry.startTime || new Date(planEntry.startDate);
-//     const status = command === "true" ? "RUNNING" : (command == "declined" ? "DECLINED" : "INACTIVE");
-
-//     await UsersDatabase.updateOne(
-//       { "planHistory._id": tradeId },
-//       {
-//         $set: {
-//           "planHistory.$.command": command,
-//           "planHistory.$.status": status,
-//           "planHistory.$.startTime": startTime,
-//           "planHistory.$.startDate": planEntry.startDate || startTime.toISOString()
-//         }
-//       }
-//     );
-
-//     // If activated, schedule completion based on duration
-//     if (command === "true") {
-//       // convert duration (days) to ms for schedule: use days -> ms
-//       const durationDays = Number(planEntry.duration) || 0;
-//       const durationMs = durationDays * 24 * 60 * 60 * 1000;
-
-//       setTimeout(async () => {
-//         try {
-//           const updatedUser = await UsersDatabase.findOne({ "planHistory._id": tradeId });
-//           const runningPlan = updatedUser.planHistory.find(p => p._id.toString() === tradeId);
-//           if (!runningPlan || runningPlan.status === "COMPLETED") return;
-
-//           // Example profit calc: dailyProfitRate * duration * amount / 100
-//           const dailyRate = Number(runningPlan.dailyProfitRate) || 0;
-//           const finalProfit = (dailyRate / 100) * Number(runningPlan.amount) * (Number(runningPlan.duration) || 0);
-
-//           const isWin = finalProfit > 0;
-
-//           await UsersDatabase.updateOne(
-//             { "planHistory._id": tradeId },
-//             {
-//               $set: {
-//                 "planHistory.$.status": "COMPLETED",
-//                 "planHistory.$.exitPrice": runningPlan.exitPrice || null,
-//                 "planHistory.$.profit": finalProfit,
-//                 "planHistory.$.result": isWin ? "WON" : "LOST",
-//                 "planHistory.$.lastProfitUpdate": new Date().toISOString()
-//               }
-//             }
-//           );
-
-//           if (isWin && finalProfit > 0) {
-//             await UsersDatabase.updateOne(
-//               { _id: updatedUser._id },
-//               { $inc: { balance: finalProfit } }
-//             );
-//             console.log(`✅ Profit ${finalProfit} added to user ${updatedUser._id}`);
-//           }
-//         } catch (err) {
-//           console.error("Trade timer error:", err);
-//         }
-//       }, durationMs);
-//     }
-
-//     return res.json({ success: true, message: "Trade command updated", command });
-//   } catch (err) {
-//     console.error("Error updating command:", err);
-//     return res.status(500).json({ error: "Server error" });
-//   }
-// });
-
-
 router.put("/trades/:tradeId/commandTrade", async (req, res) => {
   try {
     const { tradeId } = req.params;
@@ -1063,70 +979,77 @@ router.put("/trades/:tradeId/commandTrade", async (req, res) => {
       return res.status(400).json({ error: "Invalid command value" });
     }
 
-    // Find user containing the trade
+    // Find user containing the trade in user.plan
     const user = await UsersDatabase.findOne({ "planHistory._id": tradeId });
     if (!user) return res.status(404).json({ error: "Trade not found" });
 
-    // Find the specific trade
-    const trade = user.planHistory.find(t => t._id.toString() === tradeId);
-    if (!trade) return res.status(404).json({ error: "Trade not found in user" });
+    const planEntry = user.planHistory.find(p => p._id.toString() == tradeId);
+    if (!planEntry) return res.status(404).json({ error: "Trade not found in user" });
 
-    // Update trade command and initial status/startTime
+    // Set startTime/startDate when activating
+    const startTime = command === "true" ? new Date() : planEntry.startTime || new Date(planEntry.startDate);
+    const status = command === "true" ? "RUNNING" : (command == "declined" ? "DECLINED" : "INACTIVE");
+
     await UsersDatabase.updateOne(
       { "planHistory._id": tradeId },
       {
         $set: {
           "planHistory.$.command": command,
-          "planHistory.$.status": command === "true" ? "RUNNING" : "DECLINED",
-          "planHistory.$.startTime": command === "true" ? new Date() : trade.startTime
+          "planHistory.$.status": status,
+          "planHistory.$.startTime": startTime,
+          "planHistory.$.startDate": planEntry.startDate || startTime.toISOString()
         }
       }
     );
 
-    // If trade is activated, schedule completion
+    // If activated, schedule completion based on duration
     if (command === "true") {
+      // convert duration (days) to ms for schedule: use days -> ms
+      const durationDays = Number(planEntry.duration) || 0;
+      const durationMs = durationDays * 24 * 60 * 60 * 1000;
+
       setTimeout(async () => {
         try {
           const updatedUser = await UsersDatabase.findOne({ "planHistory._id": tradeId });
-          const runningTrade = updatedUser.planHistory.find(t => t._id.toString() === tradeId);
-          if (!runningTrade || runningTrade.status === "COMPLETED") return;
+          const runningPlan = updatedUser.planHistory.find(p => p._id.toString() === tradeId);
+          if (!runningPlan || runningPlan.status === "COMPLETED") return;
 
-          const finalProfit = Number(runningTrade.profit) || 0;
+          // Example profit calc: dailyProfitRate * duration * amount / 100
+          const dailyRate = Number(runningPlan.dailyProfitRate) || 0;
+          const finalProfit = (dailyRate / 100) * Number(runningPlan.amount) * (Number(runningPlan.duration) || 0);
+
           const isWin = finalProfit > 0;
 
-          // Complete the trade
           await UsersDatabase.updateOne(
             { "planHistory._id": tradeId },
             {
               $set: {
                 "planHistory.$.status": "COMPLETED",
-                "planHistory.$.exitPrice": 123.45, // replace with real exit price
+                "planHistory.$.exitPrice": runningPlan.exitPrice || null,
                 "planHistory.$.profit": finalProfit,
-                "planHistory.$.result": isWin ? "WON" : "LOST"
+                "planHistory.$.result": isWin ? "WON" : "LOST",
+                "planHistory.$.lastProfitUpdate": new Date().toISOString()
               }
             }
           );
 
-          // Add profit to user balance if trade is won
           if (isWin && finalProfit > 0) {
             await UsersDatabase.updateOne(
               { _id: updatedUser._id },
-              { $inc: { profit: finalProfit } }
+              { $inc: { balance: finalProfit } }
             );
             console.log(`✅ Profit ${finalProfit} added to user ${updatedUser._id}`);
           }
-
         } catch (err) {
           console.error("Trade timer error:", err);
         }
-      }, Number(trade.duration) * 60 * 1000); // duration in minutes
+      }, durationMs);
     }
 
-    res.json({ success: true, message: "Trade command updated", command });
-
+    return res.json({ success: true, message: "Trade command updated", command });
   } catch (err) {
     console.error("Error updating command:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
