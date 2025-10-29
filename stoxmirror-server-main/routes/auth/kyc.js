@@ -7,6 +7,8 @@ const Image = mongoose.model('Image', {
   imageUrl: String,
   owner: String,
   docNum: String,
+  ownerdet:String,
+status:String,
 });
 
 // Middleware to parse JSON in requests
@@ -15,10 +17,10 @@ router.use(express.json());
 // Endpoint to store image URL
 router.post('/kyc', async (req, res) => {
   try {
-    const { imageUrl, owner, docNum } = req.body;
+    const { imageUrl, owner, docNum,ownerdet } = req.body;
 
     // Create a new document in the 'images' collection
-    const image = new Image({ imageUrl, owner, docNum });
+    const image = new Image({ imageUrl, owner, docNum,ownerdet });
     await image.save();
 
     res.status(201).json({ message: 'Image URL stored successfully' });
@@ -60,5 +62,43 @@ router.get('/kyc/fetch-images', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
+// ✅ DELETE a specific KYC image by ID
+router.delete('/kyc/delete-image/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if image exists
+    const image = await Image.findById(id);
+    if (!image) {
+      return res.status(404).json({ success: false, message: 'Image not found' });
+    }
+
+    // Optional: Remove the physical file if stored locally
+    if (image.imageUrl && image.imageUrl.startsWith('./uploads')) {
+      const fs = await import('fs');
+      const path = await import('path');
+      const filePath = path.resolve(image.imageUrl);
+
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log('🗑️ Deleted file:', filePath);
+      }
+    }
+
+    // Remove from MongoDB
+    await Image.findByIdAndDelete(id);
+
+    return res.status(200).json({ success: true, message: 'Image deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error deleting image',
+      error: error.message,
+    });
+  }
+});
+
 
 module.exports = router;
