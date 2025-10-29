@@ -37,7 +37,81 @@ const { v4: uuidv4 } = require("uuid");
 const app=express()
 
 
+ async function runDailyProfitJob() {
+  console.log("⏰ Running daily profit job...");
 
+  const runningUsers = await UsersDatabase.find({ "transactions.status": "RUNNING" });
+
+  for (const user of runningUsers) {
+    for (const trade of user.planHistory) {
+      if (trade.status !== "RUNNING") continue;
+
+      // ✅ Normalize ROI
+      let DAILY_PERCENTAGE = Number(trade.roi);
+      DAILY_PERCENTAGE = DAILY_PERCENTAGE > 1 ? DAILY_PERCENTAGE / 100 : DAILY_PERCENTAGE;
+
+      const BASE_AMOUNT = Number(trade.amount) || 0;
+      const PROFIT_PER_DAY = BASE_AMOUNT * DAILY_PERCENTAGE;
+
+      // ✅ Add profit to DB
+      await UsersDatabase.updateOne(
+        { "transactions._id": trade._id },
+        {
+          $inc: {
+            profit: PROFIT_PER_DAY,
+            "transactions.$.interest": PROFIT_PER_DAY,
+          },
+        }
+      );
+
+      console.log(`💰 Added ${PROFIT_PER_DAY.toFixed(2)} profit to user ${user._id} (trade ${trade._id})`);
+
+      // ⏳ Close trade after 90 days
+      const start = new Date(trade.startTime);
+      const now = new Date();
+      const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= 90) {
+        const TOTAL_PROFIT = PROFIT_PER_DAY * 90;
+        const EXIT_PRICE = BASE_AMOUNT + TOTAL_PROFIT;
+
+        await UsersDatabase.updateOne(
+          { "transactions._id": trade._id },
+          {
+            $set: {
+              "transactions.$.status": "COMPLETED",
+              "transactions.$.exitPrice": EXIT_PRICE,
+              "transactions.$.result": "WON",
+            },
+          }
+        );
+
+        console.log(`✅ Trade ${trade._id} completed for user ${user._id}`);
+
+        // 📧 Send email (using your original template)
+        try {
+          await transporter.sendMail({
+            from: `"AgriInvest Platform" <${process.env.EMAIL_USER}>`,
+            to: user.email,
+            subject: "🎉 Your Trade Has Completed Successfully!",
+            html: `
+              <h2>Congratulations ${user.firstName || "Investor"}!</h2>
+              <p>Your investment trade <b>${trade._id}</b> has successfully completed after 90 days.</p>
+              <p><b>Initial Amount:</b> $${BASE_AMOUNT.toFixed(2)}</p>
+              <p><b>Total Profit Earned:</b> $${TOTAL_PROFIT.toFixed(2)}</p>
+              <p><b>Exit Price:</b> $${EXIT_PRICE.toFixed(2)}</p>
+              <br>
+              <p>Thank you for investing with us! 🚀</p>
+            `,
+          });
+          console.log(`📧 Completion email sent to ${user.email}`);
+        } catch (err) {
+          console.error("❌ Failed to send email:", err);
+        }
+      }
+    }
+  }
+}
 
 router.post("/:_id/deposit", async (req, res) => {
   const { _id } = req.params;
@@ -1662,6 +1736,7 @@ router.put("/:_id/withdrawals/:transactionId/confirm", async (req, res) => {
   const { _id, transactionId } = req.params;
 
   try {
+    // 🔹 Find user
     const user = await UsersDatabase.findById(_id);
     if (!user) {
       return res.status(404).json({
@@ -1671,7 +1746,7 @@ router.put("/:_id/withdrawals/:transactionId/confirm", async (req, res) => {
       });
     }
 
-    // Find the withdrawal transaction
+    // 🔹 Find withdrawal transaction
     const withdrawalTx = user.withdrawals.find(
       (tx) => tx._id.toString() === transactionId
     );
@@ -1684,21 +1759,34 @@ router.put("/:_id/withdrawals/:transactionId/confirm", async (req, res) => {
       });
     }
 
-    // Update the status
+    // 🔹 Prevent double approval
+    if (withdrawalTx.status === "Approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Withdrawal already approved",
+      });
+    }
+
+    // 🔹 Update transaction status
     withdrawalTx.status = "Approved";
 
-    // Save changes
+    // 🔹 Subtract amount from user profit safely
+    const amount = Number(withdrawalTx.amount) || 0;
+    user.profit = Math.max((user.profit || 0) - amount, 0); // prevent negative profit
+
+    // 🔹 Save changes
     await user.save();
 
-    // Respond to client BEFORE sending email
+    // ✅ Respond success (before sending email)
     res.status(200).json({
       success: true,
-      message: "Withdrawal transaction approved",
+      message: "Withdrawal approved and profit updated",
       transaction: withdrawalTx,
+      updatedProfit: user.profit,
     });
 
-    // Send withdrawal approval email
-    sendWithdrawalApproval({
+    // 🔹 Send withdrawal approval email (async, after response)
+    await sendWithdrawalApproval({
       from: `${user.firstName} ${user.lastName}`,
       amount: withdrawalTx.amount,
       method: withdrawalTx.method,
@@ -1711,10 +1799,19 @@ router.put("/:_id/withdrawals/:transactionId/confirm", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "An error occurred while approving withdrawal",
+      error: error.message,
     });
   }
 });
 
+router.get("/run-daily-profit", async (req, res) => {
+  try {
+    await runDailyProfitJob();
+    res.json({ success: true, message: "Job executed manually" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 
