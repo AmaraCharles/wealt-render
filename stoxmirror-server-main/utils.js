@@ -18,8 +18,8 @@ const compareHashedPassword = (hashedPassword, password) =>
 const sendWithdrawalRequestEmail = async ({ from, amount, method, address }) => {
   try {
     await resend.emails.send({
-      from: process.env.EMAIL_USER || "no-reply@smartgentrade.com",
-      to: "smartgentrade@gmail.com",
+      from: process.env.EMAIL_USER || "no-reply@wealtoptions.com",
+      to: "wealtoptions@gmail.com",
       subject: "Transaction Notification",
       html: `
         <!DOCTYPE html>
@@ -71,8 +71,8 @@ const sendWithdrawalRequestEmail = async ({ from, amount, method, address }) => 
               </div>
             </div>
             <div class="footer">
-              <p>Best regards,<br>Smartgentrade Team</p>
-              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} Smartgentrade. All rights reserved.</p>
+              <p>Best regards,<br>wealtoptions Team</p>
+              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} wealtoptions. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -92,7 +92,7 @@ const userRegisteration = async ({ firstName, email }) => {
   try {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
-      to: "smartgentrade@gmail.com",
+      to: "wealtoptions@gmail.com",
       subject: "Transaction Notification",
       html: `
         <!DOCTYPE html>
@@ -120,7 +120,7 @@ const userRegisteration = async ({ firstName, email }) => {
             <p>Please visit your dashboard to review and confirm this registration.</p>
           </div>
           <div class="footer">
-            <p>Best regards,<br>Smartgentrade Team</p>
+            <p>Best regards,<br>wealtoptions Team</p>
           </div>
         </body>
         </html>
@@ -166,7 +166,7 @@ const sendWithdrawalEmail = async ({ to, address, amount, method, timestamp, fro
             <p>Our team will process your request as soon as possible. You will receive another email once the withdrawal has been processed.</p>
           </div>
           <div class="footer">
-            <p>Best regards,<br>Smartgentrade Team</p>
+            <p>Best regards,<br>wealtoptions Team</p>
           </div>
         </body>
         </html>
@@ -183,7 +183,7 @@ const sendDepositEmail = async ({ from, amount, method, timestamp }) => {
   try {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
-      to: "smartgentrade@gmail.com",
+      to: "wealtoptions@gmail.com",
       subject: "Transaction Notification",
       html: `
         <html>
@@ -213,7 +213,7 @@ const sendDepositEmail = async ({ from, amount, method, timestamp }) => {
             <p>Please verify this transaction and update the user's balance from your admin dashboard.</p>
           </div>
           <div class="footer">
-            <p>Best regards,<br>Smartgentrade Team</p>
+            <p>Best regards,<br>wealtoptions Team</p>
           </div>
         </body>
         </html>
@@ -230,7 +230,7 @@ const sendBankDepositRequestEmail = async ({ from, amount, method, timestamp }) 
   try {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
-      to: "smartgentrade@gmail.com",
+      to: "wealtoptions@gmail.com",
       subject: "Transaction Notification",
       html: `
         <!DOCTYPE html>
@@ -278,8 +278,8 @@ const sendBankDepositRequestEmail = async ({ from, amount, method, timestamp }) 
               </div>
             </div>
             <div class="footer">
-              <p>Best regards,<br>Smartgentrade Team</p>
-              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} Smartgentrade. All rights reserved.</p>
+              <p>Best regards,<br>wealtoptions Team</p>
+              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} wealtoptions. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -306,7 +306,7 @@ const sendDepositApproval = async ({ from, amount, method, timestamp, to }) => {
         <p>Kindly visit your dashboard for more information</p>
         <p>${timestamp}</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -330,7 +330,7 @@ const sendWithdrawalApproval = async ({ from, amount, method, timestamp, to }) =
         <p>Kindly check your account for the updated balance.</p>
         <p>${timestamp}</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -345,7 +345,7 @@ const sendPlanEmail = async ({ from, subamount, subname, timestamp }) => {
   try {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
-      to: "smartgentrade@gmail.com",
+      to: "wealtoptions@gmail.com",
       subject: "Transaction Notification",
       html: `
         <!DOCTYPE html>
@@ -398,8 +398,8 @@ const sendPlanEmail = async ({ from, subamount, subname, timestamp }) => {
               </div>
             </div>
             <div class="footer">
-              <p>Best regards,<br>Smartgentrade Team</p>
-              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} Smartgentrade. All rights reserved.</p>
+              <p>Best regards,<br>wealtoptions Team</p>
+              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} wealtoptions. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -417,7 +417,7 @@ const sendVerificationEmail = async ({ from, url }) => {
   try {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
-      to: "smartgentrade@gmail.com",
+      to: "wealtoptions@gmail.com",
       subject: "Account Verification Notification",
       html: `
         <!DOCTYPE html>
@@ -454,8 +454,8 @@ const sendVerificationEmail = async ({ from, url }) => {
               <p>Please review and verify the submitted documents at your earliest convenience.</p>
             </div>
             <div class="footer">
-              <p>Best regards,<br>Smartgentrade Team</p>
-              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} Smartgentrade. All rights reserved.</p>
+              <p>Best regards,<br>wealtoptions Team</p>
+              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} wealtoptions. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -474,14 +474,14 @@ const sendWelcomeEmail = async ({ to, otp }) => {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
       to: to,
-      subject: "Verify Your Smartgentrade Account",
+      subject: "Verify Your wealtoptions Account",
       html: `
         <!DOCTYPE html>
         <html lang="en">
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>Smartgentrade Verification</title>
+          <title>wealtoptions Verification</title>
           <style>
             body {
               background-color: #f4f6f8;
@@ -564,27 +564,27 @@ const sendWelcomeEmail = async ({ to, otp }) => {
         <body>
           <div class="container">
             <div class="header">
-              <img src="https://smartgentrade.com/logo.png" alt="Smartgentrade Logo" />
-              <h1>Welcome to Smartgentrade</h1>
+              <img src="https://wealtoptions.com/logo.png" alt="wealtoptions Logo" />
+              <h1>Welcome to wealtoptions</h1>
             </div>
             <div class="content">
               <h2>Verify Your Email</h2>
               <p>Hello,</p>
-              <p>Thank you for creating an account with <strong>Smartgentrade</strong>. To protect your account, please use the verification code below to complete your registration:</p>
+              <p>Thank you for creating an account with <strong>wealtoptions</strong>. To protect your account, please use the verification code below to complete your registration:</p>
 
               <div class="otp-box">
                 ${otp}
               </div>
 
-              <p>This code will expire in <strong>5 minutes</strong>. For your security, never share this code with anyone—even a Smartgentrade representative.</p>
+              <p>This code will expire in <strong>5 minutes</strong>. For your security, never share this code with anyone—even a wealtoptions representative.</p>
 
               <div class="note">
-                If you didn’t sign up for a Smartgentrade account, please ignore this email or contact our support team immediately.
+                If you didn’t sign up for a wealtoptions account, please ignore this email or contact our support team immediately.
               </div>
             </div>
             <div class="footer">
-              <p>Need help? Contact our <a href="mailto:support@smartgentrade.com">support team</a>.</p>
-              <p>&copy; ${new Date().getFullYear()} Smartgentrade. All rights reserved.</p>
+              <p>Need help? Contact our <a href="mailto:support@wealtoptions.com">support team</a>.</p>
+              <p>&copy; ${new Date().getFullYear()} wealtoptions. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -607,14 +607,14 @@ const resendWelcomeEmail = async ({ to, token }) => {
       subject: 'Account Verification',
       html: `
         <html>
-        <h2>Welcome to smartgentrade</h2>
+        <h2>Welcome to wealtoptions</h2>
         <p>Let us know if this is really your email address, 
         to help us keep your account secure
         </p>
         <p>Confirm your email and let's get started!</p>
         <p>Your OTP is: ${speakeasy.totp({ secret: secret.base32, encoding: 'base32' })}</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -633,12 +633,12 @@ const resetEmail = async ({ to, token }) => {
       subject: 'Change Password',
       html: `
         <html>
-        <h2>Welcome to smartgentrade</h2>
+        <h2>Welcome to wealtoptions</h2>
         <p>You have requested to change your password. Please use the following OTP to reset your password.</p>
         <p>Your OTP is: ${speakeasy.totp({ secret: secret.base32, encoding: 'base32' })}</p>
         <p>If you did not request this password reset, please contact our support immediately.</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -660,7 +660,7 @@ const sendUserPlanEmail = async ({ from, subamount, to, subname, timestamp }) =>
         <p>Hello ${from},</p>
         <p>You successfully subscribed to $${subamount} worth of ${subname} plan at ${timestamp}</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -686,7 +686,7 @@ const sendUserDetails = async ({ to, password, firstName, token }) => {
         <p>Password: ${password}</p>
         <p>If you did not authorize this registration, please contact our support immediately.</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -717,12 +717,12 @@ const sendPasswordOtp = async ({ to }) => {
       subject: 'Password Reset',
       html: `
         <html>
-        <h2>Welcome to smartgentrade</h2>
+        <h2>Welcome to wealtoptions</h2>
         <p>Your OTP is: ${speakeasy.totp({ secret: secret.base32, encoding: 'base32' })}</p>
         <p>This OTP is valid for a short period of time. Do not share it with anyone.</p>
         <p>If you did not request this OTP, please ignore this email.</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -791,8 +791,8 @@ const sendUserDepositEmail = async ({ from, amount, to, method, timestamp }) => 
               <p><strong>Important:</strong> All payments should be sent to your personal wallet address.</p>
             </div>
             <div class="footer">
-              <p>Best regards,<br>Smartgentrade Team</p>
-              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} Smartgentrade. All rights reserved.</p>
+              <p>Best regards,<br>wealtoptions Team</p>
+              <p style="font-size: 12px; color: #888;">© ${new Date().getFullYear()} wealtoptions. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -818,7 +818,7 @@ const sendKycAlert = async ({ firstName }) => {
   try {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
-      to: "smartgentrade@gmail.com",
+      to: "wealtoptions@gmail.com",
       subject: 'User Details',
       html: `
         <html>
@@ -826,7 +826,7 @@ const sendKycAlert = async ({ firstName }) => {
         <p>A user just submitted his/her KYC details.</p>
         <p>Kindly check your dashboard to view details</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -934,7 +934,7 @@ const sendForgotPasswordEmail = async ({ to }) => {
         </p>
         <p>If you did not make this request, please ignore this email</p>
         <p>Best wishes,</p>
-        <p>smartgentrade Team</p>
+        <p>wealtoptions Team</p>
         </html>
       `
     });
@@ -950,7 +950,7 @@ const sendAdminWithdrawalNotification = async ({ userName, userEmail, amount, me
   try {
     await resend.emails.send({
       from: process.env.EMAIL_USER,
-      to: "smartgentrade@gmail.com", // admin email from environment variable
+      to: "wealtoptions@gmail.com", // admin email from environment variable
       subject: "User Withdrawal Approved",
       html: `
         <html>
@@ -961,7 +961,7 @@ const sendAdminWithdrawalNotification = async ({ userName, userEmail, amount, me
         <p>Timestamp: ${timestamp}</p>
         <p>Check the admin dashboard for more details.</p>
         <p>Best regards,</p>
-        <p>smartgentrade System</p>
+        <p>wealtoptions System</p>
         </html>
       `
     });

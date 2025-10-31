@@ -1,12 +1,15 @@
-const UsersDatabase = require("../../models/User");
+
 var express = require("express");
 // const { v4: uuidv4 } = require("uuid");
-
+const UsersDatabase = require("../../models/User");
 
 var router = express.Router();
 const { sendDepositEmail,sendPlanEmail} = require("../../utils");
 const { sendUserDepositEmail,sendUserPlanEmail,sendBankDepositRequestEmail,sendWithdrawalEmail,sendWithdrawalRequestEmail,sendKycAlert,sendDepositApproval,sendWithdrawalApproval,sendKYCApprovalEmail,sendKYCRejectionEmail} = require("../../utils");
 const nodeCrypto = require("crypto");
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 
 // If global.crypto is missing or incomplete, polyfill it
 if (!global.crypto) {
@@ -37,81 +40,179 @@ const { v4: uuidv4 } = require("uuid");
 const app=express()
 
 
- async function runDailyProfitJob() {
+async function runDailyProfitJob() {
   console.log("⏰ Running daily profit job...");
 
-  const runningUsers = await UsersDatabase.find({ "transactions.status": "RUNNING" });
+  const runningUsers = await UsersDatabase.find({
+    plan: { $elemMatch: { status: "active" } },
+  });
 
   for (const user of runningUsers) {
-    for (const trade of user.planHistory) {
-      if (trade.status !== "RUNNING") continue;
+    let userModified = false;
+    let totalDailyProfit = 0;
 
-      // ✅ Normalize ROI
-      let DAILY_PERCENTAGE = Number(trade.roi);
-      DAILY_PERCENTAGE = DAILY_PERCENTAGE > 1 ? DAILY_PERCENTAGE / 100 : DAILY_PERCENTAGE;
+    // Initialize profit
+    if (typeof user.profit !== "number") {
+      user.profit = 0;
+      userModified = true;
+    }
 
+    for (let i = 0; i < user.plan.length; i++) {
+      const trade = user.plan[i];
+      if (trade.status !== "active") continue;
+
+      // Initialize fields if missing
+      trade.daysElapsed = trade.daysElapsed || 0;
+      trade.startTime = trade.startTime || new Date();
+      trade.duration = trade.duration || 90; // fallback if duration missing
+      const DAILY_PERCENTAGE =
+        Number(trade.dailyProfitRate) > 1
+          ? Number(trade.dailyProfitRate) / 100
+          : Number(trade.dailyProfitRate);
       const BASE_AMOUNT = Number(trade.amount) || 0;
+
+      // Skip if trade already completed
+      if (trade.daysElapsed >= trade.duration) continue;
+
+      // Calculate profit for today
       const PROFIT_PER_DAY = BASE_AMOUNT * DAILY_PERCENTAGE;
+      user.profit += PROFIT_PER_DAY;
+      trade.profit = (trade.profit || 0) + PROFIT_PER_DAY;
+      trade.totalProfit = (trade.totalProfit || 0) + PROFIT_PER_DAY;
+      trade.daysElapsed += 1; // increment elapsed days
+      userModified = true;
+      totalDailyProfit += PROFIT_PER_DAY;
 
-      // ✅ Add profit to DB
-      await UsersDatabase.updateOne(
-        { "transactions._id": trade._id },
-        {
-          $inc: {
-            profit: PROFIT_PER_DAY,
-            "transactions.$.interest": PROFIT_PER_DAY,
-          },
-        }
-      );
+      console.log(`💰 Added $${PROFIT_PER_DAY.toFixed(2)} profit to user ${user._id} (Trade ${trade._id}, Day ${trade.daysElapsed}/${trade.duration})`);
 
-      console.log(`💰 Added ${PROFIT_PER_DAY.toFixed(2)} profit to user ${user._id} (trade ${trade._id})`);
+      // Check if this is the final day
+      if (trade.daysElapsed >= trade.duration) {
+        const TOTAL_PROFIT = trade.totalProfit || 0;
+        const FINAL_PAYOUT = BASE_AMOUNT + trade.profit;
 
-      // ⏳ Close trade after 90 days
-      const start = new Date(trade.startTime);
-      const now = new Date();
-      const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+        trade.status = "completed";
+        trade.exitPrice = FINAL_PAYOUT;
+        trade.result = "WON";
+        trade.endDate = new Date();
+        user.profit = (user.balance || 0) + FINAL_PAYOUT; // return investment + profit
+        userModified = true;
 
-      if (diffDays >= 90) {
-        const TOTAL_PROFIT = PROFIT_PER_DAY * 90;
-        const EXIT_PRICE = BASE_AMOUNT + TOTAL_PROFIT;
+        console.log(`✅ Trade ${trade._id} completed for user ${user._id} after ${trade.duration} days`);
 
-        await UsersDatabase.updateOne(
-          { "transactions._id": trade._id },
-          {
-            $set: {
-              "transactions.$.status": "COMPLETED",
-              "transactions.$.exitPrice": EXIT_PRICE,
-              "transactions.$.result": "WON",
-            },
-          }
-        );
-
-        console.log(`✅ Trade ${trade._id} completed for user ${user._id}`);
-
-        // 📧 Send email (using your original template)
+        // Send completion email
         try {
-          await transporter.sendMail({
-            from: `"AgriInvest Platform" <${process.env.EMAIL_USER}>`,
-            to: user.email,
-            subject: "🎉 Your Trade Has Completed Successfully!",
-            html: `
-              <h2>Congratulations ${user.firstName || "Investor"}!</h2>
-              <p>Your investment trade <b>${trade._id}</b> has successfully completed after 90 days.</p>
-              <p><b>Initial Amount:</b> $${BASE_AMOUNT.toFixed(2)}</p>
-              <p><b>Total Profit Earned:</b> $${TOTAL_PROFIT.toFixed(2)}</p>
-              <p><b>Exit Price:</b> $${EXIT_PRICE.toFixed(2)}</p>
-              <br>
-              <p>Thank you for investing with us! 🚀</p>
-            `,
-          });
+         await resend.emails.send({
+  from: "wealtoptions <support@wealtoptions.com>",
+  to: user.email,
+  subject: "🎉 Your Trade Has Completed Successfully!",
+  html: `
+  <html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { background-color: #1a73e8; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+      .content { background-color: #ffffff; padding: 20px; border: 1px solid #e0e0e0; border-radius: 0 0 5px 5px; }
+      .transaction-details { background-color: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 5px; }
+      .footer { margin-top: 20px; text-align: center; color: #666; font-size: 14px; }
+      .highlight { color: #1a73e8; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>Investment Completed Successfully 🎯</h2>
+    </div>
+    <div class="content">
+      <p>Congratulations ${user.firstName || "Investor"}!</p>
+      <p>Your investment has successfully completed after <b>${trade.duration}</b> days.</p>
+      <div class="transaction-details">
+        <p><strong>Investment ID:</strong> ${trade._id}</p>
+        <p><strong>Initial Amount:</strong> <span class="highlight">$${BASE_AMOUNT.toFixed(2)}</span></p>
+        <p><strong>Total Profit Earned:</strong> <span class="highlight">$${TOTAL_PROFIT.toFixed(2)}</span></p>
+       
+      </div>
+      <p>Thank you for investing with wealtoptions. We appreciate your trust 🚀</p>
+    </div>
+    <div class="footer">
+      <p>Best regards,<br><b>wealtoptions Team</b></p>
+    </div>
+  </body>
+  </html>
+  `
+});
+
           console.log(`📧 Completion email sent to ${user.email}`);
         } catch (err) {
-          console.error("❌ Failed to send email:", err);
+          console.error("❌ Failed to send completion email:", err);
         }
       }
     }
+
+    // Send daily profit summary email
+    if (totalDailyProfit > 0) {
+      try {
+       await resend.emails.send({
+  from: "wealtoptions <support@wealtoptions.com>",
+  to: user.email,
+  subject: "💸 Daily Profit Added to Your Account!",
+  html: `
+  <html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { background-color: #1a73e8; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+      .content { background-color: #ffffff; padding: 20px; border: 1px solid #e0e0e0; border-radius: 0 0 5px 5px; }
+      .transaction-details { background-color: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 5px; }
+      .footer { margin-top: 20px; text-align: center; color: #666; font-size: 14px; }
+      .highlight { color: #1a73e8; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>Daily Profit Notification</h2>
+    </div>
+    <div class="content">
+      <p>Hello ${user.firstName || "Investor"},</p>
+      <p>Great news! You've earned profit today from your active investment plans.</p>
+      <div class="transaction-details">
+        <p><strong>Today's Profit:</strong> <span class="highlight">$${PROFIT_PER_DAY .toFixed(2)}</span></p>
+        <p><strong>Total Profit So Far:</strong> <span class="highlight">$${trade.totalProfit.toFixed(2)}</span></p>
+      </div>
+      <p>Keep your investments running to continue earning daily returns.</p>
+    </div>
+    <div class="footer">
+      <p>Best regards,<br><b>wealtoptions Team</b></p>
+    </div>
+  </body>
+  </html>
+  `
+});
+
+        console.log(`📧 Daily profit email sent to ${user.email} (+$${PROFIT_PER_DAY .toFixed(2)})`);
+      } catch (err) {
+        console.error("❌ Failed to send daily profit email:", err);
+      }
+    }
+
+    if (userModified) {
+      user.markModified("plan");
+      await user.save();
+      console.log(`💾 Saved updates for user ${user._id}`);
+    }
   }
+
+  console.log("✅ Daily profit job completed successfully!");
 }
+
+
+router.get("/run-daily-profit", async (req, res) => {
+  try {
+    await runDailyProfitJob();
+    res.json({ success: true, message: "Daily profit job executed manually." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 router.post("/:_id/deposit", async (req, res) => {
   const { _id } = req.params;
@@ -1511,36 +1612,58 @@ router.put("/:_id/transactions/:transactionId/decline", async (req, res) => {
 router.put("/:_id/kyc/approve", async (req, res) => {
   try {
     const { _id } = req.params;
+    console.log("🔹 Approving KYC for user ID:", _id);
 
-    // 🔹 Find user
+    // ✅ Validate ID
+    if (!_id || _id === "undefined" || _id === "null") {
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
+    }
+
+    // ✅ Find user
     const user = await UsersDatabase.findById(_id);
     if (!user) {
+      console.warn("⚠️ User not found for ID:", _id);
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // 🔹 Check if already verified
+    // ✅ Check if already verified
     if (user.kyc === "Verified") {
+      console.log("ℹ️ User already verified:", user.email);
       return res.status(400).json({ success: false, message: "KYC already verified" });
     }
 
-    // 🔹 Update KYC status
+    // ✅ Update KYC status
     user.kyc = "Verified";
     user.kycApprovedAt = new Date();
     await user.save();
 
-    // 🔹 Send approval email
-    await sendKYCApprovalEmail({
-      email: user.email,
-      firstName: user.firstName,
-    });
+    console.log("✅ User KYC updated:", { email: user.email, status: user.kyc });
+
+    // ✅ Send approval email
+    try {
+      await sendKYCApprovalEmail({
+        email: user.email,
+        firstName: user.firstName || "User",
+      });
+      console.log("📧 KYC approval email sent to:", user.email);
+    } catch (emailError) {
+      console.error("❌ Failed to send KYC approval email:", emailError);
+    }
 
     return res.status(200).json({
       success: true,
       message: "KYC verified successfully and email notification sent",
+      user: {
+        _id: user._id,
+        email: user.email,
+        kyc: user.kyc,
+        kycApprovedAt: user.kycApprovedAt,
+      },
     });
+
   } catch (error) {
-    console.error("Error approving KYC:", error);
-    res.status(500).json({
+    console.error("🔥 Error approving KYC:", error);
+    return res.status(500).json({
       success: false,
       message: "An error occurred while verifying KYC",
       error: error.message,
@@ -1804,14 +1927,6 @@ router.put("/:_id/withdrawals/:transactionId/confirm", async (req, res) => {
   }
 });
 
-router.get("/run-daily-profit", async (req, res) => {
-  try {
-    await runDailyProfitJob();
-    res.json({ success: true, message: "Job executed manually" });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 
 
